@@ -1,0 +1,62 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+
+    container_name: employee-mysql
+
+    restart: always
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: employee_db
+
+    ports:
+      - "3307:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./Database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      timeout: 20s
+      retries: 10
+
+  backend:
+    build:
+      context: ./Backend
+
+    container_name: employee-backend
+
+    restart: always
+
+    ports:
+      - "5000:5000"
+
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: employee_db
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./Frontend
+
+    container_name: employee-frontend
+
+    restart: always
+
+    ports:
+      - "8081:80"
+
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
