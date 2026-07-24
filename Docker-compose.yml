@@ -2,9 +2,6 @@ services:
 
   mysql:
     image: mysql:8.0
-
-    container_name: employee-mysql
-
     restart: always
 
     environment:
@@ -27,8 +24,6 @@ services:
     build:
       context: ./Backend
 
-    container_name: employee-backend
-
     restart: always
 
     ports:
@@ -47,8 +42,6 @@ services:
   frontend:
     build:
       context: ./Frontend
-
-    container_name: employee-frontend
 
     restart: always
 
