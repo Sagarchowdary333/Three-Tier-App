@@ -12,7 +12,7 @@ pipeline {
 
         EC2_IP = "52.207.246.220"
 
-        PEM_FILE = "C:\\\\Jenkins\\\\keys\\\\Stackly.pem"
+        PEM_FILE = "C:\\Users\\sagar\\Desktop\\Stackly.pem"
     }
 
     stages {
