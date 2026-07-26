@@ -3,7 +3,11 @@ pipeline {
     agent any
 
     environment {
-        EC2_HOST = "52.207.246.220"
+        AWS_REGION = "us-east-1"
+        AWS_ACCOUNT_ID = "279391564753"
+
+        BACKEND_IMAGE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/employee-backend:latest"
+        FRONTEND_IMAGE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/employee-frontend:latest"
     }
 
     stages {
@@ -28,53 +32,82 @@ pipeline {
         }
 
         stage('Push Images to Amazon ECR') {
+
             steps {
-                bat '''
-                aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 279391564753.dkr.ecr.us-east-1.amazonaws.com
 
-                docker push 279391564753.dkr.ecr.us-east-1.amazonaws.com/employee-backend:latest
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-ecr'
+                ]]) {
 
-                docker push 279391564753.dkr.ecr.us-east-1.amazonaws.com/employee-frontend:latest
-                '''
+                    bat """
+                    aws ecr get-login-password --region %AWS_REGION% | docker login --username AWS --password-stdin %AWS_ACCOUNT_ID%.dkr.ecr.%AWS_REGION%.amazonaws.com
+                    """
+
+                    bat """
+                    docker tag employee-management-ci-cd-backend:latest %BACKEND_IMAGE%
+                    docker push %BACKEND_IMAGE%
+                    """
+
+                    bat """
+                    docker tag employee-management-ci-cd-frontend:latest %FRONTEND_IMAGE%
+                    docker push %FRONTEND_IMAGE%
+                    """
+
+                }
+
             }
+
         }
 
         stage('Deploy to EC2') {
+
             steps {
+
                 sshagent(credentials: ['ec2-ssh-key']) {
 
                     bat """
-                    ssh -o StrictHostKeyChecking=no ubuntu@%EC2_HOST% ^
+                    ssh -o StrictHostKeyChecking=no ubuntu@52.207.246.220 ^
                     "cd ~/employee-app && docker compose pull && docker compose up -d"
                     """
 
                 }
+
             }
+
         }
 
         stage('Verify Deployment') {
+
             steps {
-                bat """
-                ssh -o StrictHostKeyChecking=no ubuntu@%EC2_HOST% ^
-                "docker compose -f ~/employee-app/docker-compose.yml ps"
-                """
+
+                sshagent(credentials: ['ec2-ssh-key']) {
+
+                    bat """
+                    ssh -o StrictHostKeyChecking=no ubuntu@52.207.246.220 ^
+                    "docker compose -f ~/employee-app/docker-compose.yml ps"
+                    """
+
+                }
+
             }
+
         }
 
     }
 
     post {
 
+        always {
+            echo 'Pipeline execution completed.'
+        }
+
         success {
-            echo 'Application deployed successfully to EC2.'
+            echo 'Application deployed successfully!'
         }
 
         failure {
             echo 'Deployment failed.'
-        }
-
-        always {
-            echo 'Pipeline execution completed.'
         }
 
     }
