@@ -23,20 +23,11 @@ pipeline {
             }
         }
 
-        stage('Setup Buildx') {
-            steps {
-                bat '''
-                docker buildx use amd64builder
-                docker buildx inspect --bootstrap
-                docker buildx ls
-                '''
-            }
-        }
-
         stage('Show Docker Version') {
             steps {
                 bat 'docker --version'
-                bat 'docker compose version'
+                bat 'docker buildx version'
+                bat 'docker buildx ls'
             }
         }
 
@@ -54,7 +45,6 @@ pipeline {
 
                     bat '''
                     docker buildx build ^
-                    --builder amd64builder ^
                     --platform linux/amd64 ^
                     -t %BACKEND_IMAGE% ^
                     --push ^
@@ -74,7 +64,6 @@ pipeline {
 
                     bat '''
                     docker buildx build ^
-                    --builder amd64builder ^
                     --platform linux/amd64 ^
                     -t %FRONTEND_IMAGE% ^
                     --push ^
@@ -89,8 +78,7 @@ pipeline {
             steps {
 
                 bat '''
-                ssh -i "%PEM_FILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% ^
-                "cd ~/employee-app && docker compose pull && docker compose up -d"
+                ssh -i "%PEM_FILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "cd ~/employee-app && docker compose pull && docker compose up -d"
                 '''
             }
         }
@@ -100,8 +88,7 @@ pipeline {
             steps {
 
                 bat '''
-                ssh -i "%PEM_FILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% ^
-                "cd ~/employee-app && docker compose ps"
+                ssh -i "%PEM_FILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "docker ps"
                 '''
             }
         }
