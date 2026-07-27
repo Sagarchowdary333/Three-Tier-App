@@ -11,8 +11,6 @@ pipeline {
         FRONTEND_IMAGE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/employee-frontend:latest"
 
         EC2_IP = "52.207.246.220"
-
-        PEM_FILE = "C:\\Users\\sagar\\Desktop\\Stackly.pem"
     }
 
     stages {
@@ -69,10 +67,13 @@ pipeline {
 
             steps {
 
-                bat """
-                ssh -i "%PEM_FILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% ^
-                "cd ~/employee-app && docker compose pull && docker compose up -d"
-                """
+                sshagent(credentials: ['ec2-ssh-key']) {
+
+                    bat """
+                    ssh -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "cd ~/employee-app && docker compose pull && docker compose up -d"
+                    """
+
+                }
 
             }
 
@@ -82,10 +83,13 @@ pipeline {
 
             steps {
 
-                bat """
-                ssh -i "%PEM_FILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% ^
-                "cd ~/employee-app && docker compose ps"
-                """
+                sshagent(credentials: ['ec2-ssh-key']) {
+
+                    bat """
+                    ssh -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "cd ~/employee-app && docker compose ps"
+                    """
+
+                }
 
             }
 
