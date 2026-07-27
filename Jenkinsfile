@@ -23,6 +23,16 @@ pipeline {
             }
         }
 
+        stage('Setup Buildx') {
+            steps {
+                bat '''
+                docker buildx use amd64builder
+                docker buildx inspect --bootstrap
+                docker buildx ls
+                '''
+            }
+        }
+
         stage('Show Docker Version') {
             steps {
                 bat 'docker --version'
@@ -30,14 +40,7 @@ pipeline {
             }
         }
 
-        stage('Build Application') {
-            steps {
-                bat 'docker compose build'
-            }
-        }
-
-        stage('Push Images to Amazon ECR') {
-
+        stage('Build and Push Backend') {
             steps {
 
                 withCredentials([[
@@ -45,56 +48,62 @@ pipeline {
                     credentialsId: 'aws-ecr'
                 ]]) {
 
-                    bat """
+                    bat '''
                     aws ecr get-login-password --region %AWS_REGION% | docker login --username AWS --password-stdin %AWS_ACCOUNT_ID%.dkr.ecr.%AWS_REGION%.amazonaws.com
-                    """
+                    '''
 
-                    bat """
-                    docker tag employee-management-ci-cd-backend:latest %BACKEND_IMAGE%
-                    docker push %BACKEND_IMAGE%
-                    """
-
-                    bat """
-                    docker tag employee-management-ci-cd-frontend:latest %FRONTEND_IMAGE%
-                    docker push %FRONTEND_IMAGE%
-                    """
-
+                    bat '''
+                    docker buildx build ^
+                    --builder amd64builder ^
+                    --platform linux/amd64 ^
+                    -t %BACKEND_IMAGE% ^
+                    --push ^
+                    Backend
+                    '''
                 }
-
             }
+        }
 
+        stage('Build and Push Frontend') {
+            steps {
+
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-ecr'
+                ]]) {
+
+                    bat '''
+                    docker buildx build ^
+                    --builder amd64builder ^
+                    --platform linux/amd64 ^
+                    -t %FRONTEND_IMAGE% ^
+                    --push ^
+                    Frontend
+                    '''
+                }
+            }
         }
 
         stage('Deploy to EC2') {
 
             steps {
 
-                bat """
-                C:\\Windows\\System32\\OpenSSH\\ssh.exe ^
-                -i "%PEM_FILE%" ^
-                -o StrictHostKeyChecking=no ^
-                ubuntu@%EC2_IP% ^
+                bat '''
+                ssh -i "%PEM_FILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% ^
                 "cd ~/employee-app && docker compose pull && docker compose up -d"
-                """
-
+                '''
             }
-
         }
 
         stage('Verify Deployment') {
 
             steps {
 
-                bat """
-                C:\\Windows\\System32\\OpenSSH\\ssh.exe ^
-                -i "%PEM_FILE%" ^
-                -o StrictHostKeyChecking=no ^
-                ubuntu@%EC2_IP% ^
+                bat '''
+                ssh -i "%PEM_FILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% ^
                 "cd ~/employee-app && docker compose ps"
-                """
-
+                '''
             }
-
         }
 
     }
